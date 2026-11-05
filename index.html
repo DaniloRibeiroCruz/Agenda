@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agenda de Tarefas</title>
+<style>
+  :root{--bg:#f6f7fb;--card:#fff;--ink:#1d2433;--muted:#6b7280;--line:#e5e7eb;--accent:#4f46e5;--accent-soft:#eef2ff;--ok:#16a34a}
+  *{box-sizing:border-box}
+  [hidden]{display:none!important}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+  header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 20px;background:var(--card);border-bottom:1px solid var(--line)}
+  h1{font-size:20px;margin:0}
+  h2{font-size:18px;margin:0 0 4px;text-transform:capitalize}
+  .muted{color:var(--muted);font-size:14px;margin:4px 0}
+  .nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .month-title{font-size:17px;font-weight:600;text-transform:capitalize;min-width:170px;text-align:center}
+  button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);border-radius:8px;padding:6px 12px;color:var(--ink)}
+  button:hover{background:var(--accent-soft)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.primary:hover{background:#4338ca}
+  input,textarea{font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+  main{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:16px;padding:16px;max-width:1200px;margin:0 auto}
+  @media(max-width:820px){main{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+  .grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
+  .dow{font-size:12px;color:var(--muted);text-align:center;padding:4px 0;text-transform:uppercase}
+  .day{min-height:78px;border:1px solid var(--line);border-radius:10px;padding:6px;cursor:pointer;background:#fff;display:flex;flex-direction:column;gap:4px;text-align:left;align-items:stretch}
+  .day.other{opacity:.4}
+  .day.sel{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+  .num{font-size:13px;font-weight:600;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:999px}
+  .day.today .num{background:var(--accent);color:#fff}
+  .badge{font-size:11px;color:var(--muted)}
+  .badge.done{color:var(--ok);font-weight:600}
+  .dots{display:flex;gap:3px;flex-wrap:wrap}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
+  .dot.done{background:var(--ok)}
+  .legend{font-size:12px;color:var(--muted);margin:10px 0 0}
+  .night{background:var(--accent-soft);border:1px solid #c7d2fe;border-radius:12px;padding:12px;margin-bottom:12px}
+  .night p{margin:4px 0 8px;font-size:14px}
+  .progress{height:8px;background:var(--line);border-radius:999px;overflow:hidden;margin-top:10px}
+  #bar{height:100%;width:0;background:var(--ok);transition:width .3s}
+  .add{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}
+  #text{flex:1;min-width:160px}
+  .list{list-style:none;padding:0;margin:0}
+  .task{display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#fff}
+  .task.done .txt{text-decoration:line-through;color:var(--muted)}
+  .task .tt{flex:1;min-width:0;display:flex;flex-direction:column}
+  .task .txt{overflow-wrap:anywhere}
+  .task input[type=checkbox]{width:18px;height:18px;accent-color:var(--ok);flex:none}
+  small{color:var(--muted)}
+  .empty{color:var(--muted);font-size:14px;text-align:center;padding:18px 0}
+  details{margin-top:14px;font-size:14px}
+  details textarea{width:100%;margin:8px 0;font-size:12px}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:8px 14px;border-radius:999px;font-size:14px}
+  @media(max-width:600px){.day{min-height:56px;padding:4px}.dots{display:none}.badge{font-size:10px}}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Minha agenda</h1>
+    <div class="muted">Tarefas salvas neste navegador</div>
+  </div>
+  <div class="nav">
+    <button id="prev" aria-label="Mês anterior">‹</button>
+    <div id="month" class="month-title"></div>
+    <button id="next" aria-label="Próximo mês">›</button>
+    <button id="today">Hoje</button>
+    <button id="planTomorrow" class="primary">Planejar amanhã</button>
+  </div>
+</header>
+
+<main>
+  <section class="card">
+    <div id="grid" class="grid"></div>
+    <p class="legend">Cada dia mostra concluídas/total. Bolinha verde = tarefa feita.</p>
+  </section>
+
+  <section class="card">
+    <h2 id="dayTitle"></h2>
+    <div class="muted" id="dayYear"></div>
+
+    <div id="night" class="night" hidden>
+      <strong>Hora de planejar amanhã</strong>
+      <p id="nightText"></p>
+      <button id="nightBtn" class="primary">Planejar amanhã</button>
+    </div>
+
+    <div class="progress"><div id="bar"></div></div>
+    <p class="muted" id="summary"></p>
+
+    <form id="form" class="add">
+      <input id="text" placeholder="Nova tarefa" required autocomplete="off">
+      <input id="time" type="time" aria-label="Horário">
+      <button class="primary" type="submit">Adicionar</button>
+    </form>
+
+    <ul id="list" class="list"></ul>
+
+    <details id="bk">
+      <summary>Backup (copiar ou restaurar)</summary>
+      <textarea id="backup" rows="4" aria-label="Backup"></textarea>
+      <div class="row">
+        <button id="copy" type="button">Copiar</button>
+        <button id="restore" type="button">Restaurar do texto acima</button>
+      </div>
+    </details>
+  </section>
+</main>
+
+<div id="msg" class="toast" hidden></div>
+
+<script>
+const KEY = 'agenda-tarefas-v1';
+const DOW = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const $ = s => document.querySelector(s);
+const pad = n => String(n).padStart(2,'0');
+const iso = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const parse = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const todayS = () => iso(new Date());
+const tomorrowS = () => iso(addDays(new Date(), 1));
+
+let data = {};
+try { data = JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e) { data = {}; }
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(data)); } catch(e) {} }
+
+const now = new Date();
+let selected = iso(now);
+let viewY = now.getFullYear(), viewM = now.getMonth();
+
+function msg(text){
+  const m = $('#msg'); m.textContent = text; m.hidden = false;
+  clearTimeout(msg.t); msg.t = setTimeout(() => m.hidden = true, 2200);
+}
+
+function select(s){
+  selected = s;
+  const d = parse(s); viewY = d.getFullYear(); viewM = d.getMonth();
+  render();
+}
+
+function render(){ renderCal(); renderPanel(); }
+
+function renderCal(){
+  $('#month').textContent = new Date(viewY, viewM, 1).toLocaleDateString('pt-BR', {month:'long', year:'numeric'});
+  const first = new Date(viewY, viewM, 1);
+  const start = addDays(first, -first.getDay());
+  const t = todayS();
+  let h = DOW.map(d => `<div class="dow">${d}</div>`).join('');
+  for (let i = 0; i < 42; i++) {
+    const d = addDays(start, i), s = iso(d), list = data[s] || [];
+    const done = list.filter(x => x.done).length;
+    const cls = ['day'];
+    if (d.getMonth() !== viewM) cls.push('other');
+    if (s === t) cls.push('today');
+    if (s === selected) cls.push('sel');
+    h += `<button class="${cls.join(' ')}" data-d="${s}" aria-label="${d.getDate()}">` +
+         `<span class="num">${d.getDate()}</span>` +
+         (list.length ? `<span class="badge${done === list.length ? ' done' : ''}">${done}/${list.length}</span>` : '') +
+         `<span class="dots">${list.slice(0,8).map(x => `<span class="dot${x.done ? ' done' : ''}"></span>`).join('')}</span>` +
+         `</button>`;
+  }
+  $('#grid').innerHTML = h;
+}
+
+function renderPanel(){
+  const s = selected, d = parse(s), list = data[s] || [], t = todayS(), tm = tomorrowS();
+  list.sort((a,b) => (a.time || '99:99').localeCompare(b.time || '99:99'));
+
+  $('#dayTitle').textContent = d.toLocaleDateString('pt-BR', {weekday:'long', day:'numeric', month:'long'});
+  $('#dayYear').textContent = d.getFullYear() + (s === t ? ' · hoje' : s === tm ? ' · amanhã' : '');
+
+  const done = list.filter(x => x.done).length;
+  const pct = list.length ? Math.round(done / list.length * 100) : 0;
+  $('#bar').style.width = pct + '%';
+  $('#summary').textContent = list.length ? `${done} de ${list.length} concluídas (${pct}%)` : 'Nenhuma tarefa ainda';
+
+  const showNight = s === t && new Date().getHours() >= 18;
+  $('#night').hidden = !showNight;
+  if (showNight) {
+    const pending = list.filter(x => !x.done).length;
+    const tmCount = (data[tm] || []).length;
+    $('#nightText').textContent =
+      `Amanhã já tem ${tmCount} tarefa(s). ` +
+      (pending ? `${pending} pendente(s) de hoje podem ir para amanhã com o botão "→ amanhã".` : 'Todas as tarefas de hoje foram concluídas.');
+  }
+
+  $('#list').innerHTML = list.length ? list.map(x => `
+    <li class="task${x.done ? ' done' : ''}">
+      <input type="checkbox" data-act="toggle" data-id="${x.id}" ${x.done ? 'checked' : ''} aria-label="Concluir">
+      <div class="tt">
+        <span class="txt">${esc(x.text)}</span>
+        ${x.time ? `<small>${esc(x.time)}</small>` : ''}
+      </div>
+      ${!x.done ? `<button data-act="move" data-id="${x.id}" title="Passar para amanhã">→ amanhã</button>` : ''}
+      <button data-act="del" data-id="${x.id}" title="Excluir" aria-label="Excluir">×</button>
+    </li>`).join('') : '<div class="empty">Adicione a primeira tarefa do dia.</div>';
+}
+
+// Calendário: clicar em um dia
+$('#grid').addEventListener('click', e => {
+  const b = e.target.closest('button[data-d]');
+  if (b) select(b.dataset.d);
+});
+
+// Navegação de mês
+$('#prev').onclick = () => { viewM--; if (viewM < 0) { viewM = 11; viewY--; } renderCal(); };
+$('#next').onclick = () => { viewM++; if (viewM > 11) { viewM = 0; viewY++; } renderCal(); };
+$('#today').onclick = () => select(todayS());
+$('#planTomorrow').onclick = () => select(tomorrowS());
+$('#nightBtn').onclick = () => select(tomorrowS());
+
+// Adicionar tarefa
+$('#form').addEventListener('submit', e => {
+  e.preventDefault();
+  const text = $('#text').value.trim();
+  if (!text) return;
+  const time = $('#time').value;
+  (data[selected] ||= []).push({
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    text, time, done: false
+  });
+  save();
+  $('#text').value = ''; $('#time').value = '';
+  render();
+  $('#text').focus();
+});
+
+// Ações em cada tarefa
+$('#list').addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  const list = data[selected] || [];
+  const i = list.findIndex(x => x.id === el.dataset.id);
+  if (i < 0) return;
+  const act = el.dataset.act;
+
+  if (act === 'toggle') {
+    list[i].done = el.checked;
+  } else if (act === 'move') {
+    const [task] = list.splice(i, 1);
+    (data[tomorrowS()] ||= []).push({ ...task, done: false });
+    if (!list.length) delete data[selected];
+    msg('Tarefa movida para amanhã');
+  } else if (act === 'del') {
+    if (!el.dataset.armed) {
+      el.dataset.armed = '1'; el.textContent = 'Apagar?';
+      setTimeout(() => { if (el.isConnected) { el.textContent = '×'; delete el.dataset.armed; } }, 3000);
+      return;
+    }
+    list.splice(i, 1);
+    if (!list.length) delete data[selected];
+  }
+  save();
+  render();
+});
+
+// Backup manual
+$('#bk').addEventListener('toggle', () => {
+  if ($('#bk').open) $('#backup').value = JSON.stringify(data);
+});
+$('#copy').onclick = async () => {
+  $('#backup').value = JSON.stringify(data);
+  try { await navigator.clipboard.writeText($('#backup').value); msg('Copiado'); }
+  catch(e) { $('#backup').select(); msg('Copie o texto manualmente'); }
+};
+$('#restore').onclick = () => {
+  try {
+    const obj = JSON.parse($('#backup').value);
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) throw 0;
+    data = obj; save(); render(); msg('Dados restaurados');
+  } catch(e) { msg('Texto de backup inválido'); }
+};
+
+render();
+</script>
+</body>
+</html>
